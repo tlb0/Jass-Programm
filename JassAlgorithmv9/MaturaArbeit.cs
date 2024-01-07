@@ -1,14 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics;
-using System.Net.Http.Headers;
-using System.Reflection;
-using System.Reflection.Metadata.Ecma335;
-using System.Text;
-using Microsoft.Office.Interop.Excel;
-using static System.Net.Mime.MediaTypeNames;
-using static JassAlgorithm.Program;
 
 namespace MaturaArbeit
 {
@@ -181,7 +173,7 @@ namespace MaturaArbeit
 						
 						// depth = DynamicDepth(i*4 + j, maxLeafNodes, stats.Strategy(currentPlayerID));
 						// search for the best move according to the corresponding search algorithm
-						BuildAndSearch(subjectiveGame, depth, bestMove, currentPlayerID, int.MinValue, int.MaxValue);
+						BuildAndSearch(subjectiveGame, depth, bestMove, currentPlayerID, int.MinValue, int.MaxValue, true);
 						chosenCard = playableCards[bestMove];
 
 						// Play the chosen card
@@ -193,52 +185,6 @@ namespace MaturaArbeit
 				if (print)
 				{
 					PrintScoreBoard(WinnerList());
-				}
-				return Scores();
-			}
-
-			public int[] RandomGame(int id)
-			{
-				// choose trump
-				trump = random.Next(0, 3);
-
-				int depth = 6;
-				int chosenCard = 0;
-				int bestMove = 0;
-
-				GameState subjectiveGame;
-
-				for (int i = 0; i < 36 / players.Count; i++)
-				{
-					for (int j = 0; j < players.Count; j++)
-					{
-						int currentPlayerID = players[j].id;
-
-						// find out what cards current Player can play
-						List<int> playableCards = players[j].PlayableCards(this);
-
-						if (currentPlayerID == id)
-						{
-							// of all possible gameStates, chose one and create a search tree
-							subjectiveGame = players[j].mind.Possibility(this);
-							subjectiveGame.playedCards = playedCards;
-							// estimate a search depth for the tree, given a expected count of leaf nodes
-
-							// depth = DynamicDepth(i*4 + j, maxLeafNodes, stats.Strategy(currentPlayerID));
-							// search for the best move according to the corresponding search algorithm
-							BuildAndSearch(subjectiveGame, depth, bestMove, currentPlayerID, int.MinValue, int.MaxValue);
-							chosenCard = playableCards[bestMove];
-						}
-						else
-						{
-							chosenCard = playableCards[random.Next(0, playableCards.Count - 1)];
-						}
-
-						// Play the chosen card
-						PlayCard(players[j], chosenCard, false);
-					}
-					// after everybody played their Card
-					Trick(false);
 				}
 				return Scores();
 			}
@@ -907,11 +853,7 @@ namespace MaturaArbeit
 					{
 						if (deck[playedCards[0]].suit != deck[playedCards.Last()].suit)
 						{
-							if (deck[playedCards[0]].isTrump && deck[playedCards[0]].value != "J")
-							{
-								NoSameSuit(playerID, deck[playedCards[0]].suit);
-							}
-							else if (!deck[playedCards.Last()].isTrump)
+							if (deck[playedCards[0]].isTrump || !deck[playedCards.Last()].isTrump)
 							{
 								NoSameSuit(playerID, deck[playedCards[0]].suit);
 							}
@@ -1106,9 +1048,12 @@ namespace MaturaArbeit
 		}
 
 		public static Evaluation? BuildAndSearch(GameState gameState,
-				int depth, int bestMove, int optimizingPlayerID, int alpha, int beta)
+				int depth, int bestMove, int optimizingPlayerID, int alpha, int beta, bool initialCall)
 		{
-			bestMove = 0;
+			if(initialCall)
+			{
+				bestMove = 0;
+			}
 			int currentIndex = gameState.playedCards.Count;
 			Player player = gameState.players[currentIndex];
 			List<int> playableCards = player.PlayableCards(gameState);
@@ -1133,7 +1078,7 @@ namespace MaturaArbeit
 				}
 
 				// Recurson happens here
-				Evaluation? newValue = BuildAndSearch(gameState, depth - 1, bestMove, optimizingPlayerID, alpha, beta);
+				Evaluation? newValue = BuildAndSearch(gameState, depth - 1, bestMove, optimizingPlayerID, alpha, beta, false);
 				// Search procedure depends on the stategy of each player
 				switch (stats.Strategy(player.id))
 				{
@@ -1182,7 +1127,7 @@ namespace MaturaArbeit
 						break;
 				}
 				// if the best value has changed, then a better move must've been found.
-				if (bestValue == newValue)
+				if (bestValue == newValue && initialCall)
 				{
 					bestMove = i;
 				}
